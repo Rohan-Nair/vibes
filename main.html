@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Article to Twitter Thread Converter</title>
+    <style>
+      :root {
+        --bg-color: #121212;
+        --text-color: #ffffff;
+        --text-secondary: rgba(255, 255, 255, 0.7);
+        --border-color: rgba(255, 255, 255, 0.1);
+        --highlight-color: rgba(255, 255, 255, 0.1);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+      }
+
+      body {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        min-height: 100vh;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 600px;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        position: relative;
+      }
+
+      .mode-selector {
+        display: flex;
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: 24px;
+        overflow: hidden;
+        position: relative;
+        height: 38px;
+      }
+
+      .mode-button {
+        background: none;
+        border: none;
+        color: var(--text-color);
+        padding: 8px 16px;
+        cursor: pointer;
+        position: relative;
+        z-index: 2;
+        outline: none;
+        transition: color 0.3s;
+      }
+
+      .highlight {
+        position: absolute;
+        height: 38px;
+        background-color: var(--highlight-color);
+        border-radius: 24px;
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        z-index: 1;
+      }
+
+      .navigation {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .nav-button {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: none;
+        color: var(--text-color);
+        padding: 8px 16px;
+        border-radius: 24px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .nav-button:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .nav-button:active {
+        transform: scale(0.97);
+      }
+
+      .counter {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-left: 8px;
+        min-width: 50px;
+      }
+
+      .text-mode {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .text-input {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-color);
+        padding: 16px;
+        min-height: 200px;
+        resize: vertical;
+        outline: none;
+        transition: border-color 0.3s;
+      }
+
+      .text-input:focus {
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+
+      .submit-button {
+        background-color: var(--text-color);
+        color: var(--bg-color);
+        border: none;
+        border-radius: 24px;
+        padding: 12px 24px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        align-self: flex-end;
+      }
+
+      .submit-button:hover {
+        opacity: 0.9;
+      }
+
+      .submit-button:active {
+        transform: scale(0.97);
+      }
+
+      .tweets-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .tweet {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        padding: 16px;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: opacity 0.5s, transform 0.5s;
+      }
+
+      .tweet.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .tweet-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background-color: var(--text-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 12px;
+        overflow: hidden;
+      }
+
+      .avatar-text {
+        color: var(--bg-color);
+        font-weight: 700;
+        font-size: 20px;
+      }
+
+      .user-info {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .display-name {
+        font-weight: 700;
+      }
+
+      .handle {
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+
+      .tweet-content {
+        margin-bottom: 16px;
+        word-wrap: break-word;
+        line-height: 1.4;
+      }
+
+      .tweet-actions {
+        display: flex;
+        justify-content: space-between;
+        padding-right: 96px;
+      }
+
+      .action-button {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        transition: color 0.2s;
+      }
+
+      .action-button.like-button:hover,
+      .action-button.like-button.liked {
+        color: #e0245e;
+      }
+
+      .preview-tweet {
+        position: relative;
+        margin-top: 8px;
+        overflow: hidden;
+        max-height: 80px;
+      }
+
+      .preview-tweet::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 80px;
+        background: linear-gradient(transparent, var(--bg-color));
+      }
+
+      .congrats {
+        text-align: center;
+        margin-top: 32px;
+        padding: 24px;
+        opacity: 0;
+        transform: scale(0.9);
+        transition: opacity 0.5s, transform 0.5s;
+      }
+
+      .congrats.visible {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .congrats h2 {
+        margin-bottom: 8px;
+      }
+
+      .hearts-container {
+        height: 150px;
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 16px;
+      }
+
+      .heart {
+        position: absolute;
+        font-size: 30px;
+        color: var(--text-color);
+        opacity: 0;
+        transform: translateY(0);
+      }
+
+      @keyframes floatUp {
+        0% {
+          transform: translateY(100px);
+          opacity: 1;
+        }
+        100% {
+          transform: translateY(-50px);
+          opacity: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="mode-selector">
+          <div class="highlight"></div>
+          <button class="mode-button active" data-mode="text">Text</button>
+          <button class="mode-button" data-mode="tweets">Tweets</button>
+          <button class="mode-button" data-mode="liked">Likes</button>
+        </div>
+        <div class="navigation">
+          <button class="nav-button back-button" disabled>Back</button>
+          <button class="nav-button tab-button" disabled>Tab</button>
+          <span class="counter">0/0</span>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="text-mode">
+          <textarea
+            class="text-input"
+            placeholder="Paste your article or essay here..."
+          ></textarea>
+          <button class="submit-button">Convert to Tweets</button>
+        </div>
+
+        <div class="tweets-container" style="display: none"></div>
+
+        <div class="congrats" style="display: none">
+          <div class="hearts-container"></div>
+          <h2>Congratulations!</h2>
+          <p>You've reached the end of the article.</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        // Elements
+        const modeButtons = document.querySelectorAll(".mode-button");
+        const highlight = document.querySelector(".highlight");
+        const textMode = document.querySelector(".text-mode");
+        const tweetsContainer = document.querySelector(".tweets-container");
+        const textInput = document.querySelector(".text-input");
+        const submitButton = document.querySelector(".submit-button");
+        const tabButton = document.querySelector(".tab-button");
+        const backButton = document.querySelector(".back-button");
+        const counter = document.querySelector(".counter");
+        const congrats = document.querySelector(".congrats");
+
+        // State
+        let currentMode = "text";
+        let tweets = [];
+        let likedTweets = [];
+        let currentIndex = 0;
+        let displayCount = 3;
+
+        // Initialize highlight position
+        updateHighlightPosition();
+
+        // Mode switching
+        modeButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            const mode = button.dataset.mode;
+            switchMode(mode);
+          });
+        });
+
+        // Submit button
+        submitButton.addEventListener("click", () => {
+          const text = textInput.value.trim();
+          if (text) {
+            processText(text);
+            switchMode("tweets");
+          }
+        });
+
+        // Tab key navigation
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Tab") {
+            e.preventDefault();
+            if (e.shiftKey) {
+              navigateTweets("previous");
+            } else {
+              navigateTweets("next");
+            }
+          }
+        });
+
+        // Tab button
+        tabButton.addEventListener("click", () => {
+          navigateTweets("next");
+        });
+
+        // Back button
+        backButton.addEventListener("click", () => {
+          navigateTweets("previous");
+        });
+
+        // Functions
+        function switchMode(mode) {
+          if (mode === currentMode) return;
+
+          currentMode = mode;
+
+          // Update active button
+          modeButtons.forEach((button) => {
+            button.classList.toggle("active", button.dataset.mode === mode);
+          });
+
+          // Update highlight position
+          updateHighlightPosition();
+
+          // Show/hide content based on mode
+          textMode.style.display = mode === "text" ? "flex" : "none";
+          tweetsContainer.style.display = mode === "text" ? "none" : "flex";
+          congrats.style.display = "none";
+
+          // Reset tweets container
+          tweetsContainer.innerHTML = "";
+          currentIndex = 0;
+
+          // Update navigation
+          updateNavigation();
+
+          // Display appropriate tweets
+          if (mode === "tweets" && tweets.length > 0) {
+            displayTweets(tweets);
+          } else if (mode === "liked" && likedTweets.length > 0) {
+            displayTweets(likedTweets);
+          }
+        }
+
+        function updateHighlightPosition() {
+          const activeButton = document.querySelector(
+            `.mode-button[data-mode="${currentMode}"]`
+          );
+          if (activeButton) {
+            const rect = activeButton.getBoundingClientRect();
+            const parentRect = highlight.parentElement.getBoundingClientRect();
+
+            highlight.style.width = `${rect.width}px`;
+            highlight.style.transform = `translateX(${
+              rect.left - parentRect.left
+            }px)`;
+          }
+        }
+
+        function processText(text) {
+          // Split into tweets based on punctuation
+          const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+
+          tweets = [];
+          let currentTweet = "";
+
+          sentences.forEach((sentence) => {
+            const trimmedSentence = sentence.trim();
+
+            if (currentTweet.length + trimmedSentence.length + 1 <= 280) {
+              if (currentTweet) currentTweet += " ";
+              currentTweet += trimmedSentence;
+            } else {
+              if (currentTweet) tweets.push(currentTweet);
+              currentTweet = trimmedSentence;
+            }
+          });
+
+          if (currentTweet) tweets.push(currentTweet);
+
+          // Update counter
+          updateCounter();
+        }
+
+        function displayTweets(tweetsList) {
+          tweetsContainer.innerHTML = "";
+
+          const displayTweets = tweetsList.slice(
+            currentIndex,
+            currentIndex + displayCount
+          );
+          const previewTweet = tweetsList[currentIndex + displayCount];
+
+          // Display current tweets
+          displayTweets.forEach((content, index) => {
+            const tweet = createTweet(content);
+            tweet.style.transitionDelay = `${index * 0.1}s`;
+            tweetsContainer.appendChild(tweet);
+
+            setTimeout(() => {
+              tweet.classList.add("visible");
+            }, 50);
+          });
+
+          // Add preview tweet if available
+          if (previewTweet && currentMode === "tweets") {
+            const preview = createTweet(previewTweet);
+            preview.classList.add("preview-tweet");
+            tweetsContainer.appendChild(preview);
+          }
+
+          // Show congrats if at the end
+          if (
+            currentMode === "tweets" &&
+            currentIndex + displayCount >= tweets.length
+          ) {
+            showCongratulations();
+          }
+
+          // Update navigation
+          updateNavigation();
+        }
+
+        function createTweet(content) {
+          const tweet = document.createElement("div");
+          tweet.className = "tweet";
+
+          const isLiked = likedTweets.includes(content);
+
+          tweet.innerHTML = `
+          <div class="tweet-header">
+            <div class="avatar">
+              <span class="avatar-text">c</span>
+            </div>
+            <div class="user-info">
+              <span class="display-name">someonecracked</span>
+              <span class="handle">@someonefamous</span>
+            </div>
+          </div>
+          <div class="tweet-content">${content}</div>
+          <div class="tweet-actions">
+            <button class="action-button">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M14.046 2.242l-4.148-.01h-.002c-4.374 0-7.8 3.427-7.8 7.802 0 4.098 3.186 7.206 7.465 7.37v3.828c0 .108.044.286.12.403.142.225.384.347.632.347.138 0 .277-.038.402-.118.264-.168 6.473-4.14 8.088-5.506 1.902-1.61 3.04-3.97 3.043-6.312v-.017c-.006-4.367-3.43-7.787-7.8-7.788zm3.787 12.972c-1.134.96-4.862 3.405-6.772 4.643V16.67c0-.414-.335-.75-.75-.75h-.396c-3.66 0-6.318-2.476-6.318-5.886 0-3.534 2.768-6.302 6.3-6.302l4.147.01h.002c3.532 0 6.3 2.766 6.302 6.296-.003 1.91-.942 3.844-2.514 5.176z" />
+              </svg>
+            </button>
+            <button class="action-button">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M23.77 15.67c-.292-.293-.767-.293-1.06 0l-2.22 2.22V7.65c0-2.068-1.683-3.75-3.75-3.75h-5.85c-.414 0-.75.336-.75.75s.336.75.75.75h5.85c1.24 0 2.25 1.01 2.25 2.25v10.24l-2.22-2.22c-.293-.293-.768-.293-1.06 0s-.294.768 0 1.06l3.5 3.5c.145.147.337.22.53.22s.383-.072.53-.22l3.5-3.5c.294-.292.294-.767 0-1.06zm-10.66 3.28H7.26c-1.24 0-2.25-1.01-2.25-2.25V6.46l2.22 2.22c.148.147.34.22.532.22s.384-.073.53-.22c.293-.293.293-.768 0-1.06l-3.5-3.5c-.293-.294-.768-.294-1.06 0l-3.5 3.5c-.294.292-.294.767 0 1.06s.767.293 1.06 0l2.22-2.22v10.24c0 2.068 1.683 3.75 3.75 3.75h5.85c.414 0 .75-.336.75-.75s-.336-.75-.75-.75z" />
+              </svg>
+            </button>
+            <button class="action-button like-button ${isLiked ? "liked" : ""}">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M12 21.638h-.014C9.403 21.59 1.95 14.856 1.95 8.478c0-3.064 2.525-5.754 5.403-5.754 2.29 0 3.83 1.58 4.646 2.73.814-1.148 2.354-2.73 4.645-2.73 2.88 0 5.404 2.69 5.404 5.755 0 6.376-7.454 13.11-10.037 13.157H12z" />
+              </svg>
+            </button>
+            <button class="action-button">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M17.53 7.47l-5-5c-.293-.293-.768-.293-1.06 0l-5 5c-.294.293-.294.768 0 1.06s.767.294 1.06 0l3.72-3.72V15c0 .414.336.75.75.75s.75-.336.75-.75V4.81l3.72 3.72c.146.147.338.22.53.22s.384-.072.53-.22c.293-.293.293-.767 0-1.06z" />
+                <path d="M19.708 21.944H4.292C3.028 21.944 2 20.916 2 19.652V14c0-.414.336-.75.75-.75s.75.336.75.75v5.652c0 .437.355.792.792.792h15.416c.437 0 .792-.355.792-.792V14c0-.414.336-.75.75-.75s.75.336.75.75v5.652c0 1.264-1.028 2.292-2.292 2.292z" />
+              </svg>
+            </button>
+          </div>
+        `;
+
+          // Like button functionality
+          const likeButton = tweet.querySelector(".like-button");
+          likeButton.addEventListener("click", () => {
+            const likeAnimation = document.createElement("div");
+            likeAnimation.className = "like-animation";
+            likeAnimation.style.position = "absolute";
+            likeAnimation.style.top = "0";
+            likeAnimation.style.left = "0";
+            likeAnimation.style.width = "100%";
+            likeAnimation.style.height = "100%";
+            likeAnimation.style.display = "flex";
+            likeAnimation.style.justifyContent = "center";
+            likeAnimation.style.alignItems = "center";
+            likeAnimation.style.pointerEvents = "none";
+
+            const liked = likeButton.classList.toggle("liked");
+
+            // Handle liked tweets collection
+            if (liked) {
+              if (!likedTweets.includes(content)) {
+                likedTweets.push(content);
+              }
+            } else {
+              const index = likedTweets.indexOf(content);
+              if (index > -1) {
+                likedTweets.splice(index, 1);
+              }
+
+              // If in liked mode and unliked, refresh the view
+              if (currentMode === "liked") {
+                displayTweets(likedTweets);
+              }
+            }
+          });
+
+          return tweet;
+        }
+
+        function navigateTweets(direction) {
+          const tweetsList = currentMode === "tweets" ? tweets : likedTweets;
+          if (tweetsList.length === 0) return;
+
+          if (
+            direction === "next" &&
+            currentIndex + displayCount < tweetsList.length
+          ) {
+            currentIndex += displayCount;
+            displayTweets(tweetsList);
+          } else if (direction === "previous" && currentIndex > 0) {
+            currentIndex -= displayCount;
+            displayTweets(tweetsList);
+
+            // Hide congrats when going back
+            congrats.style.display = "none";
+          }
+        }
+
+        function updateNavigation() {
+          const tweetsList = currentMode === "tweets" ? tweets : likedTweets;
+
+          backButton.disabled = currentIndex === 0;
+          tabButton.disabled = currentIndex + displayCount >= tweetsList.length;
+
+          // Update counter
+          updateCounter();
+        }
+
+        function updateCounter() {
+          if (currentMode === "tweets") {
+            counter.textContent =
+              tweets.length > 0
+                ? `${Math.min(currentIndex + displayCount, tweets.length)}/${
+                    tweets.length
+                  }`
+                : "0/0";
+          } else {
+            counter.textContent = "";
+          }
+        }
+
+        function showCongratulations() {
+          congrats.style.display = "block";
+
+          setTimeout(() => {
+            congrats.classList.add("visible");
+            createHearts();
+          }, 100);
+        }
+
+        function createHearts() {
+          const container = document.querySelector(".hearts-container");
+          container.innerHTML = "";
+
+          for (let i = 0; i < 15; i++) {
+            const heart = document.createElement("div");
+            heart.className = "heart";
+            heart.textContent = "♥";
+            heart.style.left = `${Math.random() * 100}%`;
+            heart.style.animationDuration = `${Math.random() * 2 + 1}s`;
+            heart.style.fontSize = `${Math.random() * 20 + 15}px`;
+            heart.style.animation = `floatUp ${
+              Math.random() * 2 + 1
+            }s ease-out forwards`;
+            heart.style.animationDelay = `${Math.random() * 2}s`;
+
+            container.appendChild(heart);
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
